@@ -1,0 +1,42 @@
+---
+title: upx
+description: A local-first package runner — resolve a semver range against installs that already exist and run them directly, falling back to npx.
+template: splash
+hero:
+  tagline: Run a CLI from the copy already on the machine. Fall back to npx only when there isn't one.
+  actions:
+    - text: Get started
+      link: ./getting-started/introduction/
+      icon: right-arrow
+    - text: GitHub
+      link: https://github.com/repobuddy/upx
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components'
+
+```sh
+npm i -g @repobuddy/upx
+
+upx semver@^7 --coerce v1.2
+```
+
+<CardGrid>
+	<Card title="Local-first" icon="rocket">
+		Walks `node_modules` from the current directory upward, then the global root. The nearest install
+		satisfying the range wins, and `upx` spawns its binary directly.
+	</Card>
+	<Card title="Ranges, not pins" icon="approve-check">
+		Matching `^1` rather than `1.2.3` is the point — one global install serves every caller on that
+		major.
+	</Card>
+	<Card title="Transparent" icon="seti:powershell">
+		The child owns stdout, stderr, and the exit code. `upx` never wraps or reformats output, and
+		installs nothing.
+	</Card>
+	<Card title="Honest about cost" icon="warning">
+		It is a latency fix, not a correctness fix. The [tradeoffs](./concepts/tradeoffs/) are documented
+		as carefully as the wins.
+	</Card>
+</CardGrid>

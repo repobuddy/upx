@@ -1,0 +1,63 @@
+{
+	"name": "@repobuddy/upx",
+	"version": "0.0.0",
+	"description": "A local-first package runner \u2014 resolves a semver range against installed copies and runs them directly, falling back to npx",
+	"keywords": [
+		"npx",
+		"runner",
+		"cli",
+		"semver",
+		"exec"
+	],
+	"homepage": "https://github.com/repobuddy/upx#readme",
+	"bugs": "https://github.com/repobuddy/upx/issues",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/repobuddy/upx.git",
+		"directory": "packages/upx"
+	},
+	"license": "MIT",
+	"author": {
+		"name": "repobuddy"
+	},
+	"type": "module",
+	"bin": {
+		"upx": "./bin/upx.mjs"
+	},
+	"exports": {
+		"./cli": "./dist/upx.mjs",
+		"./package.json": "./package.json"
+	},
+	"files": [
+		"LICENSE",
+		"README.md",
+		"bin",
+		"dist"
+	],
+	"scripts": {
+		"build": "tsdown",
+		"coverage": "pnpm build && vitest run --coverage",
+		"prepack": "pnpm build",
+		"test": "pnpm build && vitest run src",
+		"test:watch": "vitest",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"semver": "^7.8.1"
+	},
+	"devDependencies": {
+		"@types/node": "^24.10.1",
+		"@types/semver": "^7.7.1",
+		"@vitest/coverage-v8": "^4.1.7",
+		"tsdown": "^0.23.0",
+		"typescript": "^6.0.0",
+		"vitest": "^4.1.7"
+	},
+	"engines": {
+		"node": ">=22"
+	},
+	"publishConfig": {
+		"access": "public",
+		"provenance": true
+	}
+}

@@ -1,0 +1,44 @@
+name: pull-request
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened]
+  # A merge-queue branch fires neither `pull_request` nor the main-branch `push`.
+  # Run the required `all-checks` context there so queued PRs can complete.
+  merge_group:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  ci:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # `upx` resolves paths and spawns binaries, so it is verified on every host it claims to run on.
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node-version: [lts/*]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm verify
+      - run: pnpm --filter website build
+
+  all-checks:
+    needs: [ci]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: All checks passed
+        run: |
+          if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            exit 1
+          fi
