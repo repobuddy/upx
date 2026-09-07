@@ -22,10 +22,23 @@ function pkgDirIn(base: string, pkg: string): string {
 	return path.join(base, ...pkg.split('/'))
 }
 
+const isWindows = process.platform === 'win32'
+
 function writeExecutable(filePath: string, content: string): void {
 	fs.mkdirSync(path.dirname(filePath), { recursive: true })
 	fs.writeFileSync(filePath, content)
 	fs.chmodSync(filePath, 0o755)
+}
+
+/** Puts a fake `npm`/`npx` on `PATH`. POSIX runs the shebang script itself; Windows cannot execute
+ *  one, so it gets the `.cmd` shim next to the script that npm itself installs there — which is
+ *  also what makes these tests exercise `upx`'s real cmd.exe path rather than a POSIX-only one. */
+function writeShimOnPath(name: string, body: string): void {
+	const script = path.join(binDir, isWindows ? `${name}.mjs` : name)
+	writeExecutable(script, `#!/usr/bin/env node\n${body}`)
+	if (isWindows) {
+		fs.writeFileSync(path.join(binDir, `${name}.cmd`), `@node "%~dp0${name}.mjs" %*\r\n`)
+	}
 }
 
 function markerScript(marker: string): string {
@@ -123,19 +136,17 @@ beforeEach(() => {
 	fs.mkdirSync(globalDir, { recursive: true })
 	fs.mkdirSync(cwd, { recursive: true })
 
-	writeExecutable(
-		path.join(binDir, 'npx'),
-		`#!/usr/bin/env node
-const args = process.argv.slice(2)
+	writeShimOnPath(
+		'npx',
+		`const args = process.argv.slice(2)
 process.stdout.write('NPX-SHIM ' + args.join(' ') + '\\n')
 const code = process.env.NPX_SHIM_EXIT_CODE ? Number(process.env.NPX_SHIM_EXIT_CODE) : 0
 process.exit(code)
 `,
 	)
-	writeExecutable(
-		path.join(binDir, 'npm'),
-		`#!/usr/bin/env node
-const args = process.argv.slice(2)
+	writeShimOnPath(
+		'npm',
+		`const args = process.argv.slice(2)
 if (args[0] === 'root' && args[1] === '-g') {
   process.stdout.write((process.env.FAKE_GLOBAL_ROOT || '') + '\\n')
   process.exit(0)

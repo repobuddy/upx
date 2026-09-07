@@ -1,3 +1,4 @@
+import * as path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import type { Install, RunFs } from './run.js'
 import {
@@ -264,7 +265,8 @@ describe('runUpx', () => {
 		})
 		const outcome = runUpx(['tool-a@^1.0.0', 'build'], fs)
 		expect(outcome).toEqual({ kind: 'exit', code: 0 })
-		expect(fs.spawnBinCalls).toEqual([['/proj/node_modules/tool-a/bin.js', ['build']]])
+		// `runUpx` joins with `path.join`, so the separator is the host's, not a literal `/`.
+		expect(fs.spawnBinCalls).toEqual([[path.join('/proj/node_modules/tool-a', 'bin.js'), ['build']]])
 		expect(fs.spawnNpxCalls).toEqual([])
 	})
 
