@@ -11,12 +11,13 @@ skills and scripts.
 
 ## Why it exists
 
-`npx <pkg>@<version>` pays ~1s per call — registry resolution plus spawn — **even when the package is
-already cached**, and `npx` never reuses a **global** install. A skill that shells out to a CLI dozens
-of times per run pays that cost every time. `upx` resolves the requested range against installed
-packages and spawns the local binary directly (~0.10s, ~10× faster), falling back to `npx` only when
-nothing installed satisfies the range. Because it matches a **range**, one global install serves many
-callers across versions — the advantage over pinning a single version into `node_modules`.
+`npx <pkg>@<version>` pays ~300ms per call — registry resolution plus spawn — **even when the package
+is already cached**, and `npx` never reuses a **global** install. A skill that shells out to a CLI
+dozens of times per run pays that cost every time. `upx` resolves the requested range against
+installed packages and spawns the local binary directly (~0.10s, ~3× faster), falling back to `npx`
+only when nothing installed satisfies the range. Because it matches a **range**, one global install
+serves many callers across versions — the advantage over pinning a single version into
+`node_modules`.
 
 `upx` is a **transparent exec wrapper**: the wrapped command owns stdout, stderr, and the exit code.
 `upx` never rewraps the child's output. The [AXI](https://github.com/kunchenguid/axi) output contract
