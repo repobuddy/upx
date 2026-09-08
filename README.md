@@ -16,10 +16,10 @@ upx semver@^7 --coerce v1.2
 
 ## Why
 
-`npx <pkg>@<version>` pays roughly **1s per call** — registry resolution plus spawn — *even when the
-package is already in the npx cache*, and it never reuses a globally installed copy. A script or an
-agent skill that shells out to a CLI dozens of times per run spends most of its wall clock in the
-runner.
+`npx <pkg>@<version>` pays roughly **300ms per call** — registry resolution plus spawn — *even when
+the package is already in the npx cache*, and it never reuses a globally installed copy. That is
+small once and expensive in aggregate: a script or an agent skill that shells out to a CLI dozens of
+times per run spends seconds of its wall clock inside the runner.
 
 | Path | Median | vs `npx` |
 | --- | --- | --- |
