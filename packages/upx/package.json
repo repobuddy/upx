@@ -22,7 +22,7 @@
 	},
 	"type": "module",
 	"bin": {
-		"upx": "./bin/upx.mjs"
+		"upx": "bin/upx.mjs"
 	},
 	"exports": {
 		"./cli": "./dist/upx.mjs",
