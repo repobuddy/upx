@@ -1,6 +1,6 @@
 {
 	"name": "@repobuddy/upx",
-	"version": "0.0.0",
+	"version": "0.1.0",
 	"description": "A local-first package runner \u2014 resolves a semver range against installed copies and runs them directly, falling back to npx",
 	"keywords": [
 		"npx",
