@@ -32,10 +32,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm verify
       - name: Create version pull request or publish packages
-        uses: changesets/action@v1
+        # Action v2 pairs with @changesets/cli v3. Under v1 the CLI v3 publish output
+        # does not parse, so the action pushes no tags and creates no GitHub release.
+        uses: changesets/action@v2
         with:
-          commit: "chore: version packages"
-          version: pnpm run version
-          publish: pnpm run release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: version packages"
+          version-script: pnpm run version
+          publish-script: pnpm run release
+          github-token: ${{ secrets.GITHUB_TOKEN }}
