@@ -1,5 +1,11 @@
 # @repobuddy/upx
 
+## 0.1.1
+
+### Patch Changes
+
+- 851d3da: Correct the `npx` per-call latency in the README. The prose claimed ~1s, contradicting the measurement table on the same page, which records a 315ms median on npm 12.
+
 ## 0.1.0
 
 ### Minor Changes
