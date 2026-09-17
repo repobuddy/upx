@@ -47,7 +47,10 @@ How `upx` turns `<pkg>@<range>` into a running binary:
 5. **Spawn transparently or fall back.** On a match, spawn the resolved binary with the child arguments,
    inheriting stdio, and exit with the child's exit code. On no match, run `npx` with the package spec
    **exactly as given** (`npx <pkg>` for a bare package, `npx <pkg>@<range>` otherwise) plus the child
-   arguments, pass the npx child's exit code through, and print the fallback notice.
+   arguments, pass the npx child's exit code through, and print the fallback notice — unless `--local-only`
+   was given, in which case `upx` never runs `npx` on a miss: it prints a one-line notice (same fixed
+   prefix, naming why npx was skipped) and exits **127**, the shell's "command not found" code, so
+   callers can tell "nothing installed" apart from any non-zero exit the child itself could produce.
 
 ## Use Cases
 
@@ -84,6 +87,14 @@ How `upx` turns `<pkg>@<range>` into a running binary:
   spec is a **fail-loud** error.
 - **Fail-loud on bad input** — no package spec, a malformed spec, an ambiguous/absent bin, or an unknown
   leading flag exits non-zero with a structured stderr error; `upx` never guesses.
+- **`--local-only`** — a leading flag (before the package spec; one appearing after it belongs to the
+  child). Resolution is identical to the default (parse → classify → nearest local → global → bin
+  resolution, including its fail-loud errors); on a hit it spawns transparently exactly as without the
+  flag. On a miss it never runs `npx`: it prints the fixed `upx: no installed <pkg>` prefix, worded like
+  the ordinary fallback/dist-tag notices but ending `skipped npx (--local-only)`, and exits **127**. A
+  dist-tag spec is always a miss under `--local-only` — a tag cannot be matched against an installed
+  version. Lets a caller ask "run this only if it's already installed" without paying for or triggering a
+  registry lookup — the shape of an agent skill's optional "if tool X is installed" step.
 - **`--help`** — `upx --help` prints a synopsis, the `<pkg>@<range>` form, the fallback behavior, and one
   example.
 
@@ -110,4 +121,5 @@ Every scenario in [`run.feature`](./run.feature) maps to one of these behaviors:
 | **scoped packages** | `@scope/pkg@range` parses on the last `@` and resolves |
 | **argument boundary** | flag after the spec → child; unknown flag before the spec → fail loud |
 | **fail-loud** | missing / unparseable spec exits non-zero with an `error:` structured message |
+| **`--local-only`** | hit runs local/global exactly as default; miss exits 127 with a `skipped npx (--local-only)` notice and never invokes npx; a dist-tag under it is always a miss; a `--local-only` after the spec is forwarded to the child |
 | **`--help`** | `Usage: upx` synopsis, the `<pkg>@<range>` form, the npx-fallback note |
