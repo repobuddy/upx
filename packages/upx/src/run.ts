@@ -124,31 +124,46 @@ export function resolveBinPath(pkgName: string, bin: string | Record<string, str
 
 export interface ParsedArgv {
 	help: boolean
+	/** `--local-only` seen before the spec — resolve as usual, but never fall back to `npx` on a
+	 *  miss (exit 127 with a notice instead). */
+	localOnly: boolean
 	spec: string | undefined
 	childArgs: string[]
 }
 
 export type ParseArgvResult = { ok: true; args: ParsedArgv } | { ok: false; error: string }
 
-const KNOWN_LEADING_FLAGS = new Set(['--help', '-h'])
+const KNOWN_LEADING_FLAGS = new Set(['--help', '-h', '--local-only'])
 
 /** A flag is a token starting with `-`; `upx`'s own flags are recognized only before the first
- *  non-flag token (the package spec) — everything from the spec onward belongs to the child. An
- *  unknown flag before the spec fails loud. */
+ *  non-flag token (the package spec) — everything from the spec onward belongs to the child,
+ *  including a `--local-only` that appears after it. An unknown flag before the spec fails loud. */
 export function parseArgv(argv: string[]): ParseArgvResult {
 	if (argv.length === 0) {
 		return { ok: false, error: 'error: no package spec given' }
 	}
 
-	const first = argv[0]!
-	if (first.startsWith('-')) {
-		if (KNOWN_LEADING_FLAGS.has(first)) {
-			return { ok: true, args: { help: true, spec: undefined, childArgs: [] } }
+	let localOnly = false
+	let i = 0
+	while (i < argv.length) {
+		const token = argv[i]!
+		if (!token.startsWith('-')) break
+
+		if (token === '--help' || token === '-h') {
+			return { ok: true, args: { help: true, localOnly, spec: undefined, childArgs: [] } }
 		}
-		return { ok: false, error: `error: unknown flag "${first}"` }
+		if (!KNOWN_LEADING_FLAGS.has(token)) {
+			return { ok: false, error: `error: unknown flag "${token}"` }
+		}
+		localOnly = true
+		i++
 	}
 
-	return { ok: true, args: { help: false, spec: first, childArgs: argv.slice(1) } }
+	if (i >= argv.length) {
+		return { ok: false, error: 'error: no package spec given' }
+	}
+
+	return { ok: true, args: { help: false, localOnly, spec: argv[i]!, childArgs: argv.slice(i + 1) } }
 }
 
 export function fallbackNotice(pkg: string, range: string): string {
@@ -162,10 +177,27 @@ export function distTagNotice(pkg: string, tag: string): string {
 	return `upx: no installed ${pkg}; "${tag}" is a dist-tag, using npx`
 }
 
-export const HELP_TEXT = `Usage: upx <pkg>@<range> [args…]
+/** The `--local-only` miss notice for a semver range (including the bare-package range `*`) —
+ *  same wording as {@link fallbackNotice}, naming why npx was skipped rather than used. */
+export function localOnlyMissNotice(pkg: string, range: string): string {
+	return `upx: no installed ${pkg} satisfies "${range}", skipped npx (--local-only)`
+}
+
+/** The `--local-only` miss notice for a dist-tag spec — same wording as {@link distTagNotice},
+ *  naming why npx was skipped rather than used. A dist-tag can never be matched against an
+ *  installed version, so it is always a miss under `--local-only`. */
+export function localOnlyDistTagNotice(pkg: string, tag: string): string {
+	return `upx: no installed ${pkg}; "${tag}" is a dist-tag, skipped npx (--local-only)`
+}
+
+export const HELP_TEXT = `Usage: upx [--local-only] <pkg>@<range> [args…]
 
 Runs a package's CLI from a local or global install matching <range>, falling
 back to npx when nothing installed satisfies it.
+
+Options:
+  --local-only  Never fall back to npx. Exit 127 when no installed copy
+                satisfies <range>.
 
 Example:
   $ upx semver@^7 --coerce v1.2
@@ -189,6 +221,7 @@ export function runUpx(argv: string[], fs: RunFs): RunOutcome {
 
 	const { pkg, range, bare } = specResult.spec
 	const childArgs = parsedArgv.args.childArgs
+	const { localOnly } = parsedArgv.args
 
 	const semverRange = isSemverRange(range)
 	if (semverRange) {
@@ -201,6 +234,11 @@ export function runUpx(argv: string[], fs: RunFs): RunOutcome {
 			const binPath = path.join(install.dir, binResult.bin)
 			return { kind: 'exit', code: fs.spawnBin(binPath, childArgs) }
 		}
+	}
+
+	if (localOnly) {
+		const notice = semverRange ? localOnlyMissNotice(pkg, range) : localOnlyDistTagNotice(pkg, range)
+		return { kind: 'exit', code: 127, notice }
 	}
 
 	const npxSpec = bare ? pkg : `${pkg}@${range}`

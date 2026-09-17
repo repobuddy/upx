@@ -54,6 +54,22 @@ caller pinned to that major.
 `upx` installs nothing. It is a transparent exec wrapper: the child owns stdout, stderr, and the exit
 code.
 
+## `--local-only`
+
+Some steps are optional: "if tool X is installed, ask it something; otherwise skip." Plain `upx`
+still finds the right copy when one exists, but on a miss it falls back to `npx`, which downloads on
+a cold machine and costs a registry lookup even when it doesn't. `--local-only` skips that fallback:
+it resolves exactly as `upx` always does — nearest local, then global, range-checked — and on a miss
+it exits **127** instead of reaching for `npx`.
+
+```sh
+upx --local-only buddy-agent-harness@^1 governance show skill-design --overrides-only || use the default
+```
+
+`--local-only` must appear before the package spec; anything after the spec is the child's, `upx`'s
+own included. A dist-tag (`@next`, `@latest`) is always a miss under `--local-only` — there's no
+installed version to check a tag against.
+
 ## When not to use it
 
 `upx` is a latency fix, not a correctness fix.
@@ -75,6 +91,7 @@ code.
 | A dist-tag (`@latest`, `@next`) | `npx` |
 | A declared dependency in your own package scripts | `node_modules/.bin`, via your package manager |
 | The CLI exposes a library API and you control the call site | Import it in-process — no runner at all |
+| An optional step: run a tool only if it's already installed, never download it | `upx --local-only <pkg>@<range>` (exit 127 means "not installed") |
 
 ## Documentation
 

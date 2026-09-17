@@ -166,6 +166,43 @@ Feature: upx — the local-first package runner
     Then the exit code is 1
     And stderr contains "--bogus"
 
+  # ── --local-only ──
+
+  Scenario: --local-only runs a satisfying local install, exactly as without the flag
+    When I run "upx --local-only tool-a@^1.0.0 build"
+    Then stdout contains "TOOL-A-LOCAL build"
+    And stdout does not contain "NPX-SHIM"
+    And the exit code is 0
+
+  Scenario: --local-only runs a satisfying global install when there is no local install
+    Given no local install "tool-b"
+    And a global install "tool-b" at version "1.4.0" whose bin prints "TOOL-B-GLOBAL <args>"
+    When I run "upx --local-only tool-b@^1.0.0 unit list"
+    Then stdout contains "TOOL-B-GLOBAL unit list"
+    And stdout does not contain "NPX-SHIM"
+
+  Scenario: --local-only exits 127 with a notice and never invokes npx on a miss
+    Given a shim "npx" that fails loudly if invoked
+    When I run "upx --local-only definitely-not-installed-pkg@^1"
+    Then the exit code is 127
+    And stderr contains "upx: no installed definitely-not-installed-pkg"
+    And stderr contains "skipped npx (--local-only)"
+    And npx is never invoked
+
+  Scenario: a dist-tag spec under --local-only exits 127 without npx
+    Given a shim "npx" that fails loudly if invoked
+    When I run "upx --local-only tool-a@next"
+    Then the exit code is 127
+    And stderr contains "upx: no installed tool-a"
+    And stderr contains "dist-tag"
+    And stderr contains "skipped npx (--local-only)"
+    And stderr does not contain "satisfies"
+    And npx is never invoked
+
+  Scenario: a --local-only after the package spec is forwarded to the child
+    When I run "upx tool-a@^1.0.0 --local-only"
+    Then stdout contains "TOOL-A-LOCAL --local-only"
+
   # ── Fail-loud ──
 
   Scenario: no package spec fails loud
@@ -187,3 +224,9 @@ Feature: upx — the local-first package runner
     And stdout contains "Usage: upx"
     And stdout contains "<pkg>@<range>"
     And stdout contains "npx"
+
+  Scenario: --help documents --local-only and its exit code
+    When I run "upx --help"
+    Then the exit code is 0
+    And stdout contains "--local-only"
+    And stdout contains "127"

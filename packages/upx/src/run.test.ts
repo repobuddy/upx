@@ -6,6 +6,8 @@ import {
 	fallbackNotice,
 	isSemverRange,
 	isValidPackageName,
+	localOnlyDistTagNotice,
+	localOnlyMissNotice,
 	parseArgv,
 	parseSpec,
 	resolveBinPath,
@@ -179,26 +181,29 @@ describe('parseArgv', () => {
 	it('treats the first non-flag token as the spec and forwards the rest as child args', () => {
 		expect(parseArgv(['tool-a@^1.0.0', 'build'])).toEqual({
 			ok: true,
-			args: { help: false, spec: 'tool-a@^1.0.0', childArgs: ['build'] },
+			args: { help: false, localOnly: false, spec: 'tool-a@^1.0.0', childArgs: ['build'] },
 		})
 	})
 
 	it('forwards a flag after the spec to the child untouched', () => {
 		expect(parseArgv(['tool-a@^1.0.0', '--help'])).toEqual({
 			ok: true,
-			args: { help: false, spec: 'tool-a@^1.0.0', childArgs: ['--help'] },
+			args: { help: false, localOnly: false, spec: 'tool-a@^1.0.0', childArgs: ['--help'] },
 		})
 	})
 
 	it('forwards a bare -- and args after it verbatim', () => {
 		expect(parseArgv(['tool-a@^1.0.0', '--', '--raw', 'x'])).toEqual({
 			ok: true,
-			args: { help: false, spec: 'tool-a@^1.0.0', childArgs: ['--', '--raw', 'x'] },
+			args: { help: false, localOnly: false, spec: 'tool-a@^1.0.0', childArgs: ['--', '--raw', 'x'] },
 		})
 	})
 
 	it('recognizes --help before the spec', () => {
-		expect(parseArgv(['--help'])).toEqual({ ok: true, args: { help: true, spec: undefined, childArgs: [] } })
+		expect(parseArgv(['--help'])).toEqual({
+			ok: true,
+			args: { help: true, localOnly: false, spec: undefined, childArgs: [] },
+		})
 	})
 
 	it('fails loud on an unknown flag before the spec', () => {
@@ -215,6 +220,33 @@ describe('parseArgv', () => {
 			expect(result.error).toContain('package')
 		}
 	})
+
+	it('recognizes a leading --local-only and forwards the rest', () => {
+		expect(parseArgv(['--local-only', 'tool-a@^1.0.0', 'build'])).toEqual({
+			ok: true,
+			args: { help: false, localOnly: true, spec: 'tool-a@^1.0.0', childArgs: ['build'] },
+		})
+	})
+
+	it('does not set localOnly by default', () => {
+		expect(parseArgv(['tool-a@^1.0.0'])).toEqual({
+			ok: true,
+			args: { help: false, localOnly: false, spec: 'tool-a@^1.0.0', childArgs: [] },
+		})
+	})
+
+	it('forwards a --local-only that appears after the spec to the child', () => {
+		expect(parseArgv(['tool-a@^1.0.0', '--local-only'])).toEqual({
+			ok: true,
+			args: { help: false, localOnly: false, spec: 'tool-a@^1.0.0', childArgs: ['--local-only'] },
+		})
+	})
+
+	it('fails loud when --local-only is the only argument', () => {
+		const result = parseArgv(['--local-only'])
+		expect(result.ok).toBe(false)
+		if (!result.ok) expect(result.error).toContain('package')
+	})
 })
 
 describe('fallbackNotice', () => {
@@ -230,6 +262,23 @@ describe('distTagNotice', () => {
 		expect(notice).toMatch(/^upx: no installed tool-a/)
 		expect(notice).toContain('dist-tag')
 		expect(notice).toContain('npx')
+		expect(notice).not.toContain('satisfies')
+	})
+})
+
+describe('localOnlyMissNotice', () => {
+	it('has the fixed prefix and names --local-only, not npx usage', () => {
+		const notice = localOnlyMissNotice('tool-a', '^9.0.0')
+		expect(notice).toBe('upx: no installed tool-a satisfies "^9.0.0", skipped npx (--local-only)')
+	})
+})
+
+describe('localOnlyDistTagNotice', () => {
+	it('keeps the fixed prefix, names the dist-tag, and never claims "satisfies"', () => {
+		const notice = localOnlyDistTagNotice('tool-a', 'next')
+		expect(notice).toMatch(/^upx: no installed tool-a/)
+		expect(notice).toContain('dist-tag')
+		expect(notice).toContain('--local-only')
 		expect(notice).not.toContain('satisfies')
 	})
 })
@@ -325,5 +374,51 @@ describe('runUpx', () => {
 	it('returns an error outcome for a missing package spec', () => {
 		const outcome = runUpx([], fakeRunFs())
 		expect(outcome.kind).toBe('error')
+	})
+
+	// ── --local-only ──
+
+	it('spawns a satisfying local install under --local-only, exactly as without the flag', () => {
+		const fs = fakeRunFs({
+			findLocalInstalls: () => [{ dir: '/proj/node_modules/tool-a', version: '1.2.3', bin: 'bin.js' }],
+		})
+		const outcome = runUpx(['--local-only', 'tool-a@^1.0.0', 'build'], fs)
+		expect(outcome).toEqual({ kind: 'exit', code: 0 })
+		expect(fs.spawnBinCalls).toEqual([[path.join('/proj/node_modules/tool-a', 'bin.js'), ['build']]])
+		expect(fs.spawnNpxCalls).toEqual([])
+	})
+
+	it('spawns a satisfying global install under --local-only when there is no local install', () => {
+		const fs = fakeRunFs({
+			findGlobalInstall: () => ({ dir: '/global/tool-a', version: '1.4.0', bin: 'bin.js' }),
+		})
+		const outcome = runUpx(['--local-only', 'tool-a@^1.0.0'], fs)
+		expect(outcome).toEqual({ kind: 'exit', code: 0 })
+		expect(fs.spawnBinCalls).toEqual([[path.join('/global/tool-a', 'bin.js'), []]])
+		expect(fs.spawnNpxCalls).toEqual([])
+	})
+
+	it('exits 127 with the local-only notice on a miss, and never calls npx', () => {
+		const fs = fakeRunFs()
+		const outcome = runUpx(['--local-only', 'tool-a@^9.0.0'], fs)
+		expect(outcome).toEqual({
+			kind: 'exit',
+			code: 127,
+			notice: 'upx: no installed tool-a satisfies "^9.0.0", skipped npx (--local-only)',
+		})
+		expect(fs.spawnNpxCalls).toEqual([])
+	})
+
+	it('exits 127 without npx when a dist-tag spec is used under --local-only', () => {
+		const fs = fakeRunFs()
+		const outcome = runUpx(['--local-only', 'tool-a@next'], fs)
+		expect(outcome.kind).toBe('exit')
+		if (outcome.kind === 'exit') {
+			expect(outcome.code).toBe(127)
+			expect(outcome.notice).toContain('dist-tag')
+			expect(outcome.notice).toContain('--local-only')
+			expect(outcome.notice).not.toContain('satisfies')
+		}
+		expect(fs.spawnNpxCalls).toEqual([])
 	})
 })

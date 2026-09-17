@@ -356,3 +356,63 @@ test('--help documents the runner', () => {
 	expect(result.stdout).toContain('<pkg>@<range>')
 	expect(result.stdout).toContain('npx')
 })
+
+test('--help documents --local-only and its exit code', () => {
+	const result = run(['--help'])
+	expect(result.status).toBe(0)
+	expect(result.stdout).toContain('--local-only')
+	expect(result.stdout).toContain('127')
+})
+
+// ── --local-only ──
+
+test('--local-only runs a satisfying local install, exactly as without the flag', () => {
+	const result = run(['--local-only', 'tool-a@^1.0.0', 'build'])
+	expect(result.stdout).toContain('TOOL-A-LOCAL build')
+	expect(result.stdout).not.toContain('NPX-SHIM')
+	expect(result.status).toBe(0)
+})
+
+test('--local-only runs a satisfying global install when there is no local install', () => {
+	writeStringBinInstall(globalDir, 'tool-b', '1.4.0', 'TOOL-B-GLOBAL')
+	const result = run(['--local-only', 'tool-b@^1.0.0', 'unit', 'list'])
+	expect(result.stdout).toContain('TOOL-B-GLOBAL unit list')
+	expect(result.stdout).not.toContain('NPX-SHIM')
+	expect(result.status).toBe(0)
+})
+
+test('--local-only exits 127 with the notice and never invokes npx on a miss', () => {
+	// A shim that fails loudly if invoked — proves npx is never called under --local-only.
+	writeShimOnPath(
+		'npx',
+		`process.stderr.write('npx shim invoked — must not happen under --local-only\\n')
+process.exit(99)
+`,
+	)
+	const result = run(['--local-only', 'definitely-not-installed-pkg@^1'])
+	expect(result.status).toBe(127)
+	expect(result.stderr).toContain('upx: no installed definitely-not-installed-pkg')
+	expect(result.stderr).toContain('skipped npx (--local-only)')
+	expect(result.stderr).not.toContain('npx shim invoked')
+})
+
+test('--local-only exits 127 without npx on a dist-tag spec', () => {
+	writeShimOnPath(
+		'npx',
+		`process.stderr.write('npx shim invoked — must not happen under --local-only\\n')
+process.exit(99)
+`,
+	)
+	const result = run(['--local-only', 'tool-a@next'])
+	expect(result.status).toBe(127)
+	expect(result.stderr).toContain('upx: no installed tool-a')
+	expect(result.stderr).toContain('dist-tag')
+	expect(result.stderr).toContain('skipped npx (--local-only)')
+	expect(result.stderr).not.toContain('satisfies')
+	expect(result.stderr).not.toContain('npx shim invoked')
+})
+
+test("a --local-only after the package spec is forwarded to the child, not treated as upx's flag", () => {
+	const result = run(['tool-a@^1.0.0', '--local-only'])
+	expect(result.stdout).toContain('TOOL-A-LOCAL --local-only')
+})
