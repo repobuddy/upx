@@ -3,6 +3,12 @@
 	"platformAutomerge": true,
 	"packageRules": [
 		{
+			"description": "`astro check` needs the TypeScript 6 programmatic API, which TypeScript 7 does not ship yet. Keep the website on TypeScript 6; lift when astro check supports 7.",
+			"matchFileNames": ["apps/web/package.json"],
+			"matchPackageNames": ["typescript"],
+			"allowedVersions": "<7"
+		},
+		{
 			"description": "Auto-merge non-major updates. Majors stay manual.",
 			"matchUpdateTypes": ["minor", "patch", "pin", "digest"],
 			"automerge": true
