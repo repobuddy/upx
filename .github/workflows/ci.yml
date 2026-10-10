@@ -1,0 +1,19 @@
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+  # A merge-queue branch fires neither `pull_request` nor the main-branch `push`.
+  merge_group:
+
+permissions:
+  contents: read
+
+jobs:
+  # `upx` resolves paths and spawns binaries, so it is verified on every host it
+  # claims to run on, and on both Node LTS lines `engines` admits.
+  verify:
+    uses: cyber-civitas/.github/.github/workflows/pnpm-verify.yml@v1
+    with:
+      # `pnpm verify` produces no coverage report to upload.
+      codecov: false
