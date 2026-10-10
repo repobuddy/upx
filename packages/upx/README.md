@@ -1,6 +1,6 @@
 # upx
 
-[![CI](https://github.com/repobuddy/upx/actions/workflows/release.yml/badge.svg)](https://github.com/repobuddy/upx/actions/workflows/release.yml)
+[![CI](https://github.com/cyber-civitas/upx/actions/workflows/ci.yml/badge.svg)](https://github.com/cyber-civitas/upx/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@repobuddy/upx)](https://www.npmjs.com/package/@repobuddy/upx)
 [![License](https://img.shields.io/npm/l/@repobuddy/upx)](LICENSE)
 
